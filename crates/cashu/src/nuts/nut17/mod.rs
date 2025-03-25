@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "mint")]
 use uuid::Uuid;
 
+use super::nut04::MintQuoteMiningShareResponse;
 #[cfg(feature = "mint")]
 use super::PublicKey;
 use crate::nuts::{
@@ -79,6 +80,8 @@ pub enum NotificationPayload<T> {
     MeltQuoteBolt11Response(MeltQuoteBolt11Response<T>),
     /// Mint Quote Bolt11 Response
     MintQuoteBolt11Response(MintQuoteBolt11Response<T>),
+    /// Mint Quote mining share Response
+    MintQuoteMiningShareResponse(MintQuoteMiningShareResponse<T>),
 }
 
 impl<T> From<ProofState> for NotificationPayload<T> {
@@ -109,6 +112,9 @@ pub enum Notification {
     MeltQuoteBolt11(Uuid),
     /// MintQuote id is an Uuid
     MintQuoteBolt11(Uuid),
+    // TODO is this correct?
+    /// MintQuote id is an Uuid
+    MintQuoteMiningShare(Uuid),
 }
 
 /// Kind
@@ -121,6 +127,8 @@ pub enum Kind {
     Bolt11MintQuote,
     /// Proof State
     ProofState,
+    /// Mining Share
+    MiningShareMintQuote,
 }
 
 impl<I> AsRef<I> for Params<I> {

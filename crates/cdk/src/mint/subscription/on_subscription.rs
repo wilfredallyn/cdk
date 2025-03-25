@@ -50,6 +50,10 @@ impl OnNewSubscription for OnSubscription {
                 Notification::MintQuoteBolt11(uuid) => {
                     mint_queries.push(datastore.get_mint_quote(uuid))
                 }
+                // TODO is this right? idk
+                Notification::MintQuoteMiningShare(uuid) => {
+                    mint_queries.push(datastore.get_mint_quote(uuid))
+                }
             }
         }
 

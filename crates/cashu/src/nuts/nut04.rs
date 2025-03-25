@@ -42,6 +42,24 @@ pub struct MintQuoteBolt11Request {
     pub pubkey: Option<PublicKey>,
 }
 
+/// Mint quote request [NUT-04]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+pub struct MintQuoteMiningShareRequest {
+    /// Amount
+    pub amount: Amount,
+    /// Unit wallet would like to pay with
+    pub unit: CurrencyUnit,
+    // TODO better to use a pubkey field?
+    pub header_hash: String,
+    /// Memo to create the invoice with
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// NUT-19 Pubkey
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pubkey: Option<PublicKey>,
+}
+
 /// Possible states of a quote
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
@@ -133,6 +151,63 @@ impl From<MintQuoteBolt11Response<Uuid>> for MintQuoteBolt11Response<String> {
 impl From<crate::mint::MintQuote> for MintQuoteBolt11Response<Uuid> {
     fn from(mint_quote: crate::mint::MintQuote) -> MintQuoteBolt11Response<Uuid> {
         MintQuoteBolt11Response {
+            quote: mint_quote.id,
+            request: mint_quote.request,
+            state: mint_quote.state,
+            expiry: Some(mint_quote.expiry),
+            pubkey: mint_quote.pubkey,
+        }
+    }
+}
+
+/// Mint quote response [NUT-04]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+#[serde(bound = "Q: Serialize + DeserializeOwned")]
+pub struct MintQuoteMiningShareResponse<Q> {
+    /// Quote Id
+    pub quote: Q,
+    /// Payment request to fulfil
+    pub request: String,
+    /// Quote State
+    pub state: MintQuoteState,
+    /// Unix timestamp until the quote is valid
+    pub expiry: Option<u64>,
+    /// NUT-19 Pubkey
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pubkey: Option<PublicKey>,
+}
+
+impl<Q: ToString> MintQuoteMiningShareResponse<Q> {
+    /// Convert the MintQuote with a quote type Q to a String
+    pub fn to_string_id(&self) -> MintQuoteMiningShareResponse<String> {
+        MintQuoteMiningShareResponse {
+            quote: self.quote.to_string(),
+            request: self.request.clone(),
+            state: self.state,
+            expiry: self.expiry,
+            pubkey: self.pubkey,
+        }
+    }
+}
+
+#[cfg(feature = "mint")]
+impl From<MintQuoteMiningShareResponse<Uuid>> for MintQuoteMiningShareResponse<String> {
+    fn from(value: MintQuoteMiningShareResponse<Uuid>) -> Self {
+        Self {
+            quote: value.quote.to_string(),
+            request: value.request,
+            state: value.state,
+            expiry: value.expiry,
+            pubkey: value.pubkey,
+        }
+    }
+}
+
+#[cfg(feature = "mint")]
+impl From<crate::mint::MintQuote> for MintQuoteMiningShareResponse<Uuid> {
+    fn from(mint_quote: crate::mint::MintQuote) -> MintQuoteMiningShareResponse<Uuid> {
+        MintQuoteMiningShareResponse {
             quote: mint_quote.id,
             request: mint_quote.request,
             state: mint_quote.state,

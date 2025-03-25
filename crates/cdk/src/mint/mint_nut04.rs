@@ -1,3 +1,4 @@
+use cdk_common::nut04::{MintQuoteMiningShareRequest, MintQuoteMiningShareResponse};
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -126,6 +127,55 @@ impl Mint {
 
         self.pubsub_manager
             .broadcast(NotificationPayload::MintQuoteBolt11Response(quote.clone()));
+
+        Ok(quote)
+    }
+
+    /// Create new mint mining share quote
+    #[instrument(skip_all)]
+    pub async fn get_mint_mining_share_quote(
+        &self,
+        mint_quote_request: MintQuoteMiningShareRequest,
+    ) -> Result<MintQuoteMiningShareResponse<Uuid>, Error> {
+        let MintQuoteMiningShareRequest {
+            amount,
+            unit,
+            header_hash,
+            description,
+            pubkey,
+        } = mint_quote_request;
+
+        // TODO fix this function, it is hard coded to bolt11
+        // self.check_mint_request_acceptable(amount, &unit).await?;
+
+        let mint_ttl = self.localstore.get_quote_ttl().await?.mint_ttl;
+
+        let quote_expiry = unix_time() + mint_ttl;
+
+        let quote = MintQuote::new(
+            header_hash.clone(),
+            unit.clone(),
+            amount,
+            quote_expiry,
+            // TODO is there a better request lookup ID?
+            header_hash.clone(),
+            pubkey,
+        );
+
+        tracing::debug!(
+            "New mint quote {} for {} {} with request id {}",
+            quote.id,
+            amount,
+            unit,
+            header_hash,
+        );
+
+        self.localstore.add_mint_quote(quote.clone()).await?;
+
+        let quote: MintQuoteMiningShareResponse<Uuid> = quote.into();
+
+        self.pubsub_manager
+            .broadcast(NotificationPayload::MintQuoteMiningShareResponse(quote.clone()));
 
         Ok(quote)
     }

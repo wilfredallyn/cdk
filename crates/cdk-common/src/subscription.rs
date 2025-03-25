@@ -41,6 +41,7 @@ impl TryFrom<IndexableParams> for Vec<Index<Notification>> {
                         Notification::MintQuoteBolt11(Uuid::from_str(&filter)?)
                     }
                     Kind::ProofState => Notification::ProofState(PublicKey::from_str(&filter)?),
+                    Kind::MiningShareMintQuote => Notification::MintQuoteMiningShare(Uuid::from_str(&filter)?),
                 };
 
                 Ok(Index::from((idx, params.id.clone(), sub_id)))
@@ -68,6 +69,9 @@ impl Indexable for NotificationPayload<Uuid> {
             }
             NotificationPayload::MintQuoteBolt11Response(mint_quote) => {
                 vec![Index::from(Notification::MintQuoteBolt11(mint_quote.quote))]
+            }
+            NotificationPayload::MintQuoteMiningShareResponse(mint_quote) => {
+                vec![Index::from(Notification::MintQuoteMiningShare(mint_quote.quote))]
             }
         }
     }
