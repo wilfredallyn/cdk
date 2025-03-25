@@ -153,12 +153,12 @@ impl Mint {
         let quote_expiry = unix_time() + mint_ttl;
 
         let quote = MintQuote::new(
-            header_hash.clone(),
+            header_hash.to_string(),
             unit.clone(),
             amount,
             quote_expiry,
             // TODO is there a better request lookup ID?
-            header_hash.clone(),
+            header_hash.to_string(),
             pubkey,
         );
 

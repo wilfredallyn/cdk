@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 #[cfg(feature = "mint")]
 use uuid::Uuid;
+use bitcoin_hashes::sha256::Hash;
 
 use super::nut00::{BlindSignature, BlindedMessage, CurrencyUnit, PaymentMethod};
 use super::{MintQuoteState, PublicKey};
@@ -51,7 +52,7 @@ pub struct MintQuoteMiningShareRequest {
     /// Unit wallet would like to pay with
     pub unit: CurrencyUnit,
     // TODO better to use a pubkey field?
-    pub header_hash: String,
+    pub header_hash: Hash,
     /// Memo to create the invoice with
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
