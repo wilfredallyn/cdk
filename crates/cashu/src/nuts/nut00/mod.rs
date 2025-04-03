@@ -395,7 +395,13 @@ impl CurrencyUnit {
             Self::Msat => Some(1),
             Self::Usd => Some(2),
             Self::Eur => Some(3),
-            _ => None,
+            Self::Custom(s) => {
+                // Simple, stable hash for consistent derivation index
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                s.hash(&mut hasher);
+                let hash = hasher.finish();
+                Some((hash % u32::MAX as u64) as u32 + 10_000) // Offset to avoid colliding with known units
+            }
         }
     }
 }
