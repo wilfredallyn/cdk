@@ -368,13 +368,11 @@ impl Wallet {
         let active_keyset_id = self.get_active_mint_keyset_local().await?.id;
 
         // Retrieve the keyset counter, defaulting to 0 if not found
-        // TODO do we need to update the counter if it was not returned?
         let count = self
             .localstore
             .get_keyset_counter(&active_keyset_id)
             .await?
-            .unwrap_or(0)
-            + 1;
+            .unwrap_or(0);
 
         let premint_secrets = self.generate_premint_secrets(
             active_keyset_id,
@@ -387,6 +385,14 @@ impl Wallet {
         self.localstore
             .add_premint_secrets(quote_id, &premint_secrets)
             .await?;
+
+        let num_secrets: u32 = premint_secrets
+            .secrets
+            .len()
+            .try_into()
+            .map_err(|_| Error::AmountOverflow)?;
+
+        let result = self.localstore.increment_keyset_counter(&active_keyset_id, num_secrets).await;
 
         Ok(premint_secrets)
     }

@@ -234,6 +234,22 @@ pub struct MintBolt11Request<Q> {
     pub signature: Option<String>,
 }
 
+/// Mint request [NUT-04]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+#[serde(bound = "Q: Serialize + DeserializeOwned")]
+pub struct MintMiningShareRequest<Q> {
+    /// Quote id
+    #[cfg_attr(feature = "swagger", schema(max_length = 1_000))]
+    pub quote: Q,
+    /// Outputs
+    #[cfg_attr(feature = "swagger", schema(max_items = 1_000))]
+    pub outputs: Vec<BlindedMessage>,
+    /// Signature
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+}
+
 #[cfg(feature = "mint")]
 impl TryFrom<MintBolt11Request<String>> for MintBolt11Request<Uuid> {
     type Error = uuid::Error;
@@ -259,10 +275,30 @@ impl<Q> MintBolt11Request<Q> {
     }
 }
 
+impl<Q> MintMiningShareRequest<Q> {
+    /// Total [`Amount`] of outputs
+    pub fn total_amount(&self) -> Result<Amount, Error> {
+        Amount::try_sum(
+            self.outputs
+                .iter()
+                .map(|BlindedMessage { amount, .. }| *amount),
+        )
+        .map_err(|_| Error::AmountOverflow)
+    }
+}
+
 /// Mint response [NUT-04]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
 pub struct MintBolt11Response {
+    /// Blinded Signatures
+    pub signatures: Vec<BlindSignature>,
+}
+
+/// Mint response [NUT-04]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+pub struct MintMiningShareResponse {
     /// Blinded Signatures
     pub signatures: Vec<BlindSignature>,
 }

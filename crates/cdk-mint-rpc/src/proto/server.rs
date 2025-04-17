@@ -478,6 +478,31 @@ impl CdkMint for MintRPCServer {
         Ok(Response::new(UpdateResponse {}))
     }
 
+    // TODO why did this stop compiling?
+    // async fn get_quotes(
+    //     &self,
+    // ) -> Result<Response<UpdateResponse>, Status> {
+    //     let current_ttl = self
+    //         .mint
+    //         .quote_ttl()
+    //         .await
+    //         .map_err(|err| Status::internal(err.to_string()))?;
+
+    //     let request = request.into_inner();
+
+    //     let quote_ttl = QuoteTTL {
+    //         mint_ttl: request.mint_ttl.unwrap_or(current_ttl.mint_ttl),
+    //         melt_ttl: request.melt_ttl.unwrap_or(current_ttl.melt_ttl),
+    //     };
+
+    //     self.mint
+    //         .set_quote_ttl(quote_ttl)
+    //         .await
+    //         .map_err(|err| Status::internal(err.to_string()))?;
+
+    //     Ok(Response::new(UpdateResponse {}))
+    // }
+
     async fn update_quote_ttl(
         &self,
         request: Request<UpdateQuoteTtlRequest>,

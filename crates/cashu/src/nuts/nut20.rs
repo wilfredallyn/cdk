@@ -5,7 +5,7 @@ use std::str::FromStr;
 use bitcoin::secp256k1::schnorr::Signature;
 use thiserror::Error;
 
-use super::{MintBolt11Request, PublicKey, SecretKey};
+use super::{nut04::MintMiningShareRequest, MintBolt11Request, PublicKey, SecretKey};
 
 /// Nut19 Error
 #[derive(Debug, Error)]
@@ -58,6 +58,56 @@ where
     }
 
     /// Verify signature on [`MintBolt11Request`]
+    pub fn verify_signature(&self, pubkey: PublicKey) -> Result<(), Error> {
+        let signature = self.signature.as_ref().ok_or(Error::SignatureMissing)?;
+
+        let signature = Signature::from_str(signature).map_err(|_| Error::InvalidSignature)?;
+
+        let msg_to_sign = self.msg_to_sign();
+
+        pubkey.verify(&msg_to_sign, &signature)?;
+
+        Ok(())
+    }
+}
+
+impl<Q> MintMiningShareRequest<Q>
+where
+    Q: ToString,
+{
+    /// Constructs the message to be signed according to NUT-20 specification.
+    ///
+    /// The message is constructed by concatenating (as UTF-8 encoded bytes):
+    /// 1. The quote ID (as UTF-8)
+    /// 2. All blinded secrets (B_0 through B_n) converted to hex strings (as UTF-8)
+    ///
+    /// Format: `quote_id || B_0 || B_1 || ... || B_n`
+    /// where each component is encoded as UTF-8 bytes
+    pub fn msg_to_sign(&self) -> Vec<u8> {
+        // Pre-calculate capacity to avoid reallocations
+        let quote_id = self.quote.to_string();
+        let capacity = quote_id.len() + (self.outputs.len() * 66);
+        let mut msg = Vec::with_capacity(capacity);
+        msg.append(&mut quote_id.clone().into_bytes()); // String.into_bytes() produces UTF-8
+        for output in &self.outputs {
+            // to_hex() creates a hex string, into_bytes() converts it to UTF-8 bytes
+            msg.append(&mut output.blinded_secret.to_hex().into_bytes());
+        }
+        msg
+    }
+
+    /// Sign [`MintMiningShareRequest`]
+    pub fn sign(&mut self, secret_key: SecretKey) -> Result<(), Error> {
+        let msg = self.msg_to_sign();
+
+        let signature: Signature = secret_key.sign(&msg)?;
+
+        self.signature = Some(signature.to_string());
+
+        Ok(())
+    }
+
+    /// Verify signature on [`MintMiningShareRequest`]
     pub fn verify_signature(&self, pubkey: PublicKey) -> Result<(), Error> {
         let signature = self.signature.as_ref().ok_or(Error::SignatureMissing)?;
 

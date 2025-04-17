@@ -1,4 +1,5 @@
-use cdk_common::nut04::{MintQuoteMiningShareRequest, MintQuoteMiningShareResponse};
+use cdk_common::nut04::{MintMiningShareRequest, MintQuoteMiningShareRequest, MintQuoteMiningShareResponse};
+use cdk_common::BlindedMessage;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -133,9 +134,10 @@ impl Mint {
 
     /// Create new mint mining share quote
     #[instrument(skip_all)]
-    pub async fn get_mint_mining_share_quote(
+    pub async fn create_paid_mint_mining_share_quote(
         &self,
         mint_quote_request: MintQuoteMiningShareRequest,
+        blinded_messages: Vec<BlindedMessage>,
     ) -> Result<MintQuoteMiningShareResponse<Uuid>, Error> {
         let MintQuoteMiningShareRequest {
             amount,
@@ -171,6 +173,16 @@ impl Mint {
         );
 
         self.localstore.add_mint_quote(quote.clone()).await?;
+        // TODO implement block template validation and make this a separate API call
+        self.pay_mint_quote(&quote).await?;
+
+        let mint_mining_share_request = MintMiningShareRequest { 
+            quote: quote.id,
+            outputs: blinded_messages,
+            signature: None,
+        };
+
+        self.process_mining_mint_request(mint_mining_share_request).await?;
 
         let quote: MintQuoteMiningShareResponse<Uuid> = quote.into();
 
@@ -305,6 +317,114 @@ impl Mint {
             .mint_quote_bolt11_status(mint_quote.clone(), MintQuoteState::Paid);
 
         Ok(())
+    }
+
+    // TODO this is a cheap copy, DRY this function and the next one
+    /// Process mining mint request
+    #[instrument(skip_all)]
+    pub async fn process_mining_mint_request(
+        &self,
+        mint_request: nut04::MintMiningShareRequest<Uuid>,
+    ) -> Result<nut04::MintMiningShareResponse, Error> {
+        let mint_quote =
+            if let Some(mint_quote) = self.localstore.get_mint_quote(&mint_request.quote).await? {
+                mint_quote
+            } else {
+                return Err(Error::UnknownQuote);
+            };
+
+        let state = self
+            .localstore
+            .update_mint_quote_state(&mint_request.quote, MintQuoteState::Pending)
+            .await?;
+
+        let state = if state == MintQuoteState::Unpaid {
+            self.check_mint_quote_paid(&mint_quote.id).await?
+        } else {
+            state
+        };
+
+        match state {
+            MintQuoteState::Unpaid => {
+                let _state = self
+                    .localstore
+                    .update_mint_quote_state(&mint_request.quote, MintQuoteState::Unpaid)
+                    .await?;
+                return Err(Error::UnpaidQuote);
+            }
+            MintQuoteState::Pending => {
+                return Err(Error::PendingQuote);
+            }
+            MintQuoteState::Issued => {
+                let _state = self
+                    .localstore
+                    .update_mint_quote_state(&mint_request.quote, MintQuoteState::Issued)
+                    .await?;
+                return Err(Error::IssuedQuote);
+            }
+            MintQuoteState::Paid => (),
+        }
+
+        // If the there is a public key provoided in mint quote request
+        // verify the signature is provided for the mint request
+        if let Some(pubkey) = mint_quote.pubkey {
+            mint_request.verify_signature(pubkey)?;
+        }
+
+        let Verification { amount, unit } = match self.verify_outputs(&mint_request.outputs).await {
+            Ok(verification) => verification,
+            Err(err) => {
+                tracing::debug!("Could not verify mint outputs");
+                self.localstore
+                    .update_mint_quote_state(&mint_request.quote, MintQuoteState::Paid)
+                    .await?;
+
+                return Err(err);
+            }
+        };
+
+        // We check the the total value of blinded messages == mint quote
+        if amount != mint_quote.amount {
+            return Err(Error::TransactionUnbalanced(
+                mint_quote.amount.into(),
+                mint_request.total_amount()?.into(),
+                0,
+            ));
+        }
+
+        if unit != mint_quote.unit {
+            return Err(Error::UnsupportedUnit);
+        }
+
+        let mut blind_signatures = Vec::with_capacity(mint_request.outputs.len());
+
+        for blinded_message in mint_request.outputs.iter() {
+            let blind_signature = self.blind_sign(blinded_message).await?;
+            blind_signatures.push(blind_signature);
+        }
+
+        self.localstore
+            .add_blind_signatures(
+                &mint_request
+                    .outputs
+                    .iter()
+                    .map(|p| p.blinded_secret)
+                    .collect::<Vec<PublicKey>>(),
+                &blind_signatures,
+                Some(mint_request.quote),
+            )
+            .await?;
+
+        self.localstore
+            .update_mint_quote_state(&mint_request.quote, MintQuoteState::Issued)
+            .await?;
+
+        self.pubsub_manager
+            .mint_quote_bolt11_status(mint_quote, MintQuoteState::Issued);
+
+        Ok(nut04::MintMiningShareResponse {
+            signatures: blind_signatures,
+        })
     }
 
     /// Process mint request
