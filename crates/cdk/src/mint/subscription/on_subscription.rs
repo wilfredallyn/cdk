@@ -51,6 +51,9 @@ impl OnNewSubscription for OnSubscription {
                     mint_queries.push(datastore.get_mint_quote(uuid))
                 }
                 // TODO is this right? idk
+                Notification::MeltQuoteMiningShare(uuid) => {
+                    melt_queries.push(datastore.get_melt_quote(uuid))
+                }
                 Notification::MintQuoteMiningShare(uuid) => {
                     mint_queries.push(datastore.get_mint_quote(uuid))
                 }

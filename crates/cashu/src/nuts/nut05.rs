@@ -226,6 +226,82 @@ impl From<&MeltQuote> for MeltQuoteBolt11Response<Uuid> {
     }
 }
 
+/// Melt quote response [NUT-05]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "swagger", derive(utoipa::ToSchema))]
+#[serde(bound = "Q: Serialize + for<'a> Deserialize<'a>")]
+pub struct MeltQuoteMiningShareResponse<Q> {
+    /// Quote Id
+    pub quote: Q,
+    /// The amount that needs to be provided
+    pub amount: Amount,
+    /// The fee reserve that is required
+    pub fee_reserve: Amount,
+    /// Whether the request haas be paid
+    // TODO: To be deprecated
+    /// Deprecated
+    pub paid: Option<bool>,
+    /// Quote State
+    pub state: MeltQuoteState,
+    /// Unix timestamp until the quote is valid
+    pub expiry: u64,
+    /// Payment preimage
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payment_preimage: Option<String>,
+    /// Change
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub change: Option<Vec<BlindSignature>>,
+}
+
+impl<Q: ToString> MeltQuoteMiningShareResponse<Q> {
+    /// Convert a `MeltQuoteMiningShareResponse` with type Q (generic/unknown) to a
+    /// `MeltQuoteMiningShareResponse` with `String`
+    pub fn to_string_id(self) -> MeltQuoteMiningShareResponse<String> {
+        MeltQuoteMiningShareResponse {
+            quote: self.quote.to_string(),
+            amount: self.amount,
+            fee_reserve: self.fee_reserve,
+            paid: self.paid,
+            state: self.state,
+            expiry: self.expiry,
+            payment_preimage: self.payment_preimage,
+            change: self.change,
+        }
+    }
+}
+
+#[cfg(feature = "mint")]
+impl From<MeltQuoteMiningShareResponse<Uuid>> for MeltQuoteMiningShareResponse<String> {
+    fn from(value: MeltQuoteMiningShareResponse<Uuid>) -> Self {
+        Self {
+            quote: value.quote.to_string(),
+            amount: value.amount,
+            fee_reserve: value.fee_reserve,
+            paid: value.paid,
+            state: value.state,
+            expiry: value.expiry,
+            payment_preimage: value.payment_preimage,
+            change: value.change,
+        }
+    }
+}
+
+#[cfg(feature = "mint")]
+impl From<&MeltQuote> for MeltQuoteMiningShareResponse<Uuid> {
+    fn from(melt_quote: &MeltQuote) -> MeltQuoteMiningShareResponse<Uuid> {
+        MeltQuoteMiningShareResponse {
+            quote: melt_quote.id,
+            payment_preimage: None,
+            change: None,
+            state: melt_quote.state,
+            paid: Some(melt_quote.state == MeltQuoteState::Paid),
+            expiry: melt_quote.expiry,
+            amount: melt_quote.amount,
+            fee_reserve: melt_quote.fee_reserve,
+        }
+    }
+}
+
 // A custom deserializer is needed until all mints
 // update some will return without the required state.
 impl<'de, Q: DeserializeOwned> Deserialize<'de> for MeltQuoteBolt11Response<Q> {

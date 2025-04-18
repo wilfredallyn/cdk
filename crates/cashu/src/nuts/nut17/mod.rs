@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::nut04::MintQuoteMiningShareResponse;
+use super::nut05::MeltQuoteMiningShareResponse;
 #[cfg(feature = "mint")]
 use super::PublicKey;
 use crate::nuts::{
@@ -78,6 +79,8 @@ pub enum NotificationPayload<T> {
     ProofState(ProofState),
     /// Melt Quote Bolt11 Response
     MeltQuoteBolt11Response(MeltQuoteBolt11Response<T>),
+    /// Melt Quote mining share Response
+    MeltQuoteMiningShareResponse(MeltQuoteMiningShareResponse<T>),
     /// Mint Quote Bolt11 Response
     MintQuoteBolt11Response(MintQuoteBolt11Response<T>),
     /// Mint Quote mining share Response
@@ -102,6 +105,18 @@ impl<T> From<MintQuoteBolt11Response<T>> for NotificationPayload<T> {
     }
 }
 
+impl<T> From<MeltQuoteMiningShareResponse<T>> for NotificationPayload<T> {
+    fn from(melt_quote: MeltQuoteMiningShareResponse<T>) -> NotificationPayload<T> {
+        NotificationPayload::MeltQuoteMiningShareResponse(melt_quote)
+    }
+}
+
+impl<T> From<MintQuoteMiningShareResponse<T>> for NotificationPayload<T> {
+    fn from(mint_quote: MintQuoteMiningShareResponse<T>) -> NotificationPayload<T> {
+        NotificationPayload::MintQuoteMiningShareResponse(mint_quote)
+    }
+}
+
 #[cfg(feature = "mint")]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 /// A parsed notification
@@ -112,7 +127,9 @@ pub enum Notification {
     MeltQuoteBolt11(Uuid),
     /// MintQuote id is an Uuid
     MintQuoteBolt11(Uuid),
-    // TODO is this correct?
+    // TODO is this correct? idk
+    /// MeltQuote id is an Uuid
+    MeltQuoteMiningShare(Uuid),
     /// MintQuote id is an Uuid
     MintQuoteMiningShare(Uuid),
 }

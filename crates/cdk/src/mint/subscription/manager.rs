@@ -3,6 +3,8 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use cdk_common::database::{self, MintDatabase};
+use cdk_common::nut04::MintQuoteMiningShareResponse;
+use cdk_common::nut05::MeltQuoteMiningShareResponse;
 use cdk_common::nut17::Notification;
 use cdk_common::NotificationPayload;
 use uuid::Uuid;
@@ -62,6 +64,34 @@ impl PubSubManager {
 
     /// Helper function to emit a MeltQuoteBolt11Response status
     pub fn melt_quote_status<E: Into<MeltQuoteBolt11Response<Uuid>>>(
+        &self,
+        quote: E,
+        payment_preimage: Option<String>,
+        change: Option<Vec<BlindSignature>>,
+        new_state: MeltQuoteState,
+    ) {
+        let mut quote = quote.into();
+        quote.state = new_state;
+        quote.paid = Some(new_state == MeltQuoteState::Paid);
+        quote.payment_preimage = payment_preimage;
+        quote.change = change;
+        self.broadcast(quote.into());
+    }
+
+    /// Helper function to emit a MintQuoteMiningShareResponse status
+    pub fn mint_mining_quote_status<E: Into<MintQuoteMiningShareResponse<Uuid>>>(
+        &self,
+        quote: E,
+        new_state: MintQuoteState,
+    ) {
+        let mut event = quote.into();
+        event.state = new_state;
+
+        self.broadcast(event.into());
+    }
+
+    /// Helper function to emit a MeltQuoteMiningShareResponse status
+    pub fn melt_mining_quote_status<E: Into<MeltQuoteMiningShareResponse<Uuid>>>(
         &self,
         quote: E,
         payment_preimage: Option<String>,

@@ -420,7 +420,7 @@ impl Mint {
             .await?;
 
         self.pubsub_manager
-            .mint_quote_bolt11_status(mint_quote, MintQuoteState::Issued);
+            .mint_mining_quote_status(mint_quote, MintQuoteState::Issued);
 
         Ok(nut04::MintMiningShareResponse {
             signatures: blind_signatures,
