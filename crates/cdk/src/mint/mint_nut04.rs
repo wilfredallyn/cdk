@@ -1,6 +1,6 @@
 use cdk_common::nut04::{MintMiningShareRequest, MintQuoteMiningShareRequest, MintQuoteMiningShareResponse};
 use cdk_common::BlindedMessage;
-use tracing::instrument;
+use tracing::{instrument, debug};
 use uuid::Uuid;
 
 use super::verification::Verification;
@@ -139,6 +139,7 @@ impl Mint {
         mint_quote_request: MintQuoteMiningShareRequest,
         blinded_messages: Vec<BlindedMessage>,
     ) -> Result<MintQuoteMiningShareResponse<Uuid>, Error> {
+
         let MintQuoteMiningShareRequest {
             amount,
             unit,
@@ -164,8 +165,8 @@ impl Mint {
             pubkey,
         );
 
-        tracing::debug!(
-            "New mint quote {} for {} {} with request id {}",
+        debug!(
+            "New mint quote {} created for {} {} with request id {}",
             quote.id,
             amount,
             unit,
@@ -173,6 +174,10 @@ impl Mint {
         );
 
         self.localstore.add_mint_quote(quote.clone()).await?;
+        
+        debug!("Current state of mint quotes after creating new quote:");
+        self.debug_print_mint_quotes().await?;
+
         // TODO implement block template validation and make this a separate API call
         self.pay_mint_quote(&quote).await?;
 
@@ -183,8 +188,13 @@ impl Mint {
         };
 
         self.process_mining_mint_request(mint_mining_share_request).await?;
+        debug!("Successfully processed mining mint request for quote {}", quote.id);
 
-        let quote: MintQuoteMiningShareResponse<Uuid> = quote.into();
+        // Fetch the latest state from the database
+        let latest_quote = self.localstore.get_mint_quote(&quote.id).await?
+            .ok_or(Error::UnknownQuote)?;
+        
+        let quote: MintQuoteMiningShareResponse<Uuid> = latest_quote.into();
 
         self.pubsub_manager
             .broadcast(NotificationPayload::MintQuoteMiningShareResponse(quote.clone()));
@@ -305,6 +315,7 @@ impl Mint {
             self.localstore
                 .update_mint_quote_state(&mint_quote.id, MintQuoteState::Paid)
                 .await?;
+            debug!("Updated mint quote {} state to Paid", mint_quote.id);
         } else {
             tracing::debug!(
                 "{} Quote already {} continuing",
@@ -532,5 +543,24 @@ impl Mint {
         Ok(nut04::MintBolt11Response {
             signatures: blind_signatures,
         })
+    }
+
+    /// Debug function to print current state of all mint quotes
+    #[instrument(skip_all)]
+    pub async fn debug_print_mint_quotes(&self) -> Result<(), Error> {
+        let quotes = self.localstore.get_mint_quotes().await?;
+        debug!("Current mint quotes in database ({} total):", quotes.len());
+        for quote in quotes {
+            debug!(
+                "Quote {}: amount={} {}, state={:?}, request={}, request_lookup_id={}",
+                quote.id,
+                quote.amount,
+                quote.unit,
+                quote.state,
+                quote.request,
+                quote.request_lookup_id
+            );
+        }
+        Ok(())
     }
 }
